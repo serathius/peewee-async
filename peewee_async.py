@@ -844,6 +844,10 @@ class AsyncDatabase:
     _async_wait = None  # connection waiter
     _task_data = None   # asyncio per-task data
 
+    def init(self, database, timeout=None, **connect_kwargs):
+        self.timeout = timeout
+        super().init(database, **connect_kwargs)
+
     def __setattr__(self, name, value):
         if name == 'allow_sync':
             warnings.warn(
@@ -879,12 +883,14 @@ class AsyncDatabase:
         else:
             self._loop = loop
             self._async_wait = asyncio.Future(loop=self._loop)
+            connection_kwargs = self.connect_kwargs_async
+            if timeout is not None:
+                connection_kwargs['timeout'] = timeout
 
             conn = self._async_conn_cls(
                 database=self.database,
                 loop=self._loop,
-                timeout=timeout,
-                **self.connect_kwargs_async)
+                **connection_kwargs)
 
             try:
                 yield from conn.connect()
@@ -1118,6 +1124,7 @@ class AsyncPostgresqlMixin(AsyncDatabase):
             'maxsize': self.max_connections,
             'enable_json': self._enable_json,
             'enable_hstore': self._enable_hstore,
+            'timeout': self.timeout,
         })
         return kwargs
 
@@ -1299,6 +1306,7 @@ class MySQLDatabase(AsyncDatabase, peewee.MySQLDatabase):
             'minsize': self.min_connections,
             'maxsize': self.max_connections,
             'autocommit': True,
+            'timeout': self.timeout,
         })
         return kwargs
 
